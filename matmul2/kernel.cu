@@ -10,11 +10,7 @@
 #include <iomanip>
 #define BLOCK_SIZE 16
 
-/*
- * prints matrices
- * Because matrices filled with dummy 0s function takes 3 dim arguments:
- *      actual x and y dimension and dim as big square matrix's dimension
- */
+
 void print_matrices(float* matrix, char* file_Name, int x_dim, int y_dim, int dim)
 {
     std::ofstream outFile;
@@ -32,9 +28,7 @@ void print_matrices(float* matrix, char* file_Name, int x_dim, int y_dim, int di
     }
 }
 
-//naive CPU matrix multiplication code
-//because of its simplicity directly taken from web
-//it multiplies square matrices
+
 __host__ void cpu_matrix_mult(float* h_a, float* h_b, float* h_result, int m) {
     for (int i = 0; i < m; ++i)
     {
@@ -50,8 +44,7 @@ __host__ void cpu_matrix_mult(float* h_a, float* h_b, float* h_result, int m) {
     }
 }
 
-//this function is for filling the matrices with cos and sin values randomly
-//I transform the matrices to square matrix in order to perform better multiplication
+
 __host__ int fill(float** Lmatrix, float** Rmatrix, int LdimX, int LdimY, int RdimX, int RdimY) {
 
     int sqr_dim_X, sqr_dim_Y, size;
@@ -97,19 +90,7 @@ __host__ int fill(float** Lmatrix, float** Rmatrix, int LdimX, int LdimY, int Rd
     return size;
 }
 
-// Kernel that executes on the CUDA device
-/* left: left operand
- * right: right operand
- * res : result array
- * dim: M dimension of MxM matrix
- * Blok_size: defines block size
- *
- * this function divides the matrices to tiles and load those tiles to shared memory
- * After loading to shared memory it function multiplies with the corresponding tile of other matrix
- * After finishing multiplication of 1 row and 1 column by collecting results of different tiles
- * it stores the result in global memory
- * Function has coalesced access to the global memory and prevent bank conflict
- */
+
 __global__ void multiply(float* left, float* right, float* res, int dim) {
 
     int i, j;
@@ -118,51 +99,50 @@ __global__ void multiply(float* left, float* right, float* res, int dim) {
     __shared__ float Left_shared_t[BLOCK_SIZE][BLOCK_SIZE];
     __shared__ float Right_shared_t[BLOCK_SIZE][BLOCK_SIZE];
 
-    // Row i of matrix left
+   
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
 
     for (int tileNUM = 0; tileNUM < gridDim.x; tileNUM++) {
 
-        // Column j of matrix left
+       
         j = tileNUM * BLOCK_SIZE + threadIdx.x;
         i = tileNUM * BLOCK_SIZE + threadIdx.y;
-        // Load left[i][j] to shared mem
+       
 
-        Left_shared_t[threadIdx.y][threadIdx.x] = left[row * dim + j];// Coalesced access
-        // Load right[i][j] to shared mem
+        Left_shared_t[threadIdx.y][threadIdx.x] = left[row * dim + j];
+        
 
-        Right_shared_t[threadIdx.y][threadIdx.x] = right[i * dim + col]; // Coalesced access
-        // Synchronize before computation
+        Right_shared_t[threadIdx.y][threadIdx.x] = right[i * dim + col]; 
+        
         __syncthreads();
 
-        // Accumulate one tile of res from tiles of left and right in shared mem
+        
         for (int k = 0; k < BLOCK_SIZE; k++) {
 
-            temp += Left_shared_t[threadIdx.y][k] * Right_shared_t[k][threadIdx.x]; //no shared memory bank conflict
+            temp += Left_shared_t[threadIdx.y][k] * Right_shared_t[k][threadIdx.x]; 
         }
-        // Synchronize
+        
         __syncthreads();
     }
-    // Store accumulated value to res
+   
     res[row * dim + col] = temp;
 }
 
-// main routine that executes on the host
+
 int main(void)
 {
-    //size of the vectors to be processed  and matrix dimensions
+    
     int Left_matrix_x, Left_matrix_y, Right_matrix_x, Right_matrix_y, Left_vector_size, Right_vector_size;
 
-    float* Left_Vector_h, * Right_Vector_h, * Left_Vector_d, * Right_Vector_d, * Res_h, * Res_d, * CPU;  // Pointer to host & device arrays
+    float* Left_Vector_h, * Right_Vector_h, * Left_Vector_d, * Right_Vector_d, * Res_h, * Res_d, * CPU;  
 
     printf("Enter m n n k :\n");
 
-    scanf("%d %d %d %d", &Left_matrix_x, &Left_matrix_y, &Right_matrix_x, &Right_matrix_y); // input matrix dimensions are taken
+    scanf("%d %d %d %d", &Left_matrix_x, &Left_matrix_y, &Right_matrix_x, &Right_matrix_y); 
 
-    int dim = fill(&Left_Vector_h, &Right_Vector_h, Left_matrix_x, Left_matrix_y, Right_matrix_x, Right_matrix_y); //fills the matrices with random values
-
+    int dim = fill(&Left_Vector_h, &Right_Vector_h, Left_matrix_x, Left_matrix_y, Right_matrix_x, Right_matrix_y); 
     print_matrices(Left_Vector_h, "Input_LHS", Left_matrix_x, Left_matrix_y, dim);
     print_matrices(Right_Vector_h, "Input_RHS", Right_matrix_x, Right_matrix_y, dim);
 
